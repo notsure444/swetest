@@ -1,0 +1,144 @@
+{
+  "projectMetadata": {
+    "version": "1.0.0",
+    "name": "PROJECT_NAME_PLACEHOLDER",
+    "description": "PROJECT_DESCRIPTION_PLACEHOLDER",
+    "type": "web|mobile|fullstack",
+    "createdAt": "CREATION_TIMESTAMP",
+    "updatedAt": "UPDATE_TIMESTAMP",
+    "status": "created"
+  },
+  "configuration": {
+    "techStack": [],
+    "requirements": "",
+    "deliverables": [],
+    "evaluationCriteria": [],
+    "estimatedDuration": "",
+    "targetAudience": "",
+    "businessGoals": [],
+    "technicalConstraints": []
+  },
+  "projectStructure": {
+    "srcDirectory": "src",
+    "testDirectory": "tests",
+    "docsDirectory": "docs",
+    "buildDirectory": "build",
+    "assetsDirectory": "src/assets"
+  },
+  "agentConfiguration": {
+    "enabledAgents": [
+      "ProjectManager",
+      "SystemArchitect",
+      "TaskPlanner",
+      "CodeGenerator",
+      "TestEngineer",
+      "QAAnalyst",
+      "DeploymentEngineer"
+    ],
+    "workflowSteps": [
+      "architecture_design",
+      "task_creation",
+      "work_assignment",
+      "coding",
+      "testing",
+      "qa",
+      "deployment"
+    ],
+    "parallelExecution": false,
+    "retryAttempts": 3
+  },
+  "containerConfiguration": {
+    "isolationLevel": "high",
+    "resourceLimits": {
+      "memory": "1G",
+      "cpus": "1.0",
+      "storage": "5G"
+    },
+    "networkIsolation": true,
+    "securityProfile": "restricted",
+    "ports": {
+      "development": "4000-4099",
+      "testing": "5000-5099",
+      "deployment": "6000-6099"
+    }
+  },
+  "developmentConfiguration": {
+    "packageManager": "npm|yarn|pnpm",
+    "nodeVersion": "18",
+    "buildTool": "webpack|vite|rollup",
+    "linting": {
+      "enabled": true,
+      "tool": "eslint",
+      "rules": "standard"
+    },
+    "formatting": {
+      "enabled": true,
+      "tool": "prettier"
+    },
+    "typeChecking": {
+      "enabled": true,
+      "tool": "typescript"
+    }
+  },
+  "testingConfiguration": {
+    "framework": "jest|vitest|mocha",
+    "coverage": {
+      "enabled": true,
+      "threshold": 80,
+      "reporters": ["text", "html", "lcov"]
+    },
+    "e2e": {
+      "enabled": true,
+      "tool": "playwright|cypress"
+    },
+    "performance": {
+      "enabled": false,
+      "tool": "lighthouse|k6"
+    }
+  },
+  "deploymentConfiguration": {
+    "strategy": "docker|serverless|static",
+    "target": "preview|staging|production",
+    "cicd": {
+      "enabled": true,
+      "provider": "github|gitlab|jenkins"
+    },
+    "monitoring": {
+      "enabled": true,
+      "healthChecks": true,
+      "metrics": true,
+      "logging": true
+    }
+  },
+  "qualityGates": {
+    "codeQuality": {
+      "enabled": true,
+      "threshold": 8.0
+    },
+    "testCoverage": {
+      "enabled": true,
+      "minimum": 80
+    },
+    "performance": {
+      "enabled": true,
+      "loadTime": "< 2s",
+      "lighthouse": "> 90"
+    },
+    "security": {
+      "enabled": true,
+      "vulnerabilityScan": true,
+      "dependencyCheck": true
+    }
+  },
+  "integrations": {
+    "convex": {
+      "enabled": true,
+      "deployment": "",
+      "functions": [],
+      "schema": {}
+    },
+    "externalAPIs": [],
+    "databases": [],
+    "services": []
+  }
+}
