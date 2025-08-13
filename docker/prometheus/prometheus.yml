@@ -1,0 +1,96 @@
+# Prometheus configuration for Convex AI Agent Platform monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'convex-ai-platform'
+
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Convex Backend
+  - job_name: 'convex-backend'
+    static_configs:
+      - targets: ['convex-backend:3210']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Dashboard Frontend
+  - job_name: 'dashboard'
+    static_configs:
+      - targets: ['dashboard:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: '/metrics'
+
+  # Project Manager
+  - job_name: 'project-manager'
+    static_configs:
+      - targets: ['project-manager:3500']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    metrics_path: '/metrics'
+
+  # MinIO
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  # Elasticsearch
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: '/_prometheus/metrics'
+
+  # Dynamic project containers (discovered via file-based service discovery)
+  - job_name: 'project-containers'
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/project-targets.json'
+    relabel_configs:
+      - source_labels: [__meta_project_id]
+        target_label: project_id
+      - source_labels: [__meta_project_type]
+        target_label: project_type
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
