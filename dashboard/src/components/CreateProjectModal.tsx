@@ -16,9 +16,39 @@ const projectSchema = z.object({
   type: z.enum(['web', 'mobile', 'fullstack'], { required_error: 'Project type is required' }),
   techStack: z.array(z.string()).min(1, 'At least one technology is required'),
   requirements: z.string().min(10, 'Requirements must be at least 10 characters'),
-  deliverables: z.array(z.string()).min(1, 'At least one deliverable is required'),
-  evaluationCriteria: z.array(z.string()).min(1, 'At least one evaluation criterion is required'),
-  isolationLevel: z.enum(['basic', 'standard', 'strict']).default('standard'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
+  complexity: z.enum(['simple', 'moderate', 'complex', 'enterprise']).default('moderate'),
+  estimatedDuration: z.string().optional(),
+  targetAudience: z.string().optional(),
+  businessGoals: z.array(z.string()).optional(),
+  technicalConstraints: z.array(z.string()).optional(),
+  deliverables: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    type: z.enum(['feature', 'component', 'documentation', 'test', 'deployment']),
+    acceptanceCriteria: z.array(z.string()),
+    dependencies: z.array(z.string()),
+    estimatedEffort: z.number(),
+    assignedAgentType: z.string().optional(),
+    dueDate: z.number().optional(),
+  })).min(1, 'At least one deliverable is required'),
+  evaluations: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    type: z.enum(['functionality', 'performance', 'security', 'usability', 'maintainability']),
+    weight: z.number().min(1).max(10),
+    automatedCheck: z.boolean(),
+    testScript: z.string().optional(),
+    criteria: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      metric: z.string(),
+      threshold: z.union([z.string(), z.number()]),
+      critical: z.boolean(),
+    })),
+  })).min(1, 'At least one evaluation is required'),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -593,4 +623,5 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     </div>
   );
 }
+
 
