@@ -123,7 +123,7 @@ You have access to code generation tools, semantic code search, testing framewor
 - Validating system performance and reliability
 
 You have access to testing tools, isolated test environments, and can coordinate with development agents to ensure software quality.`,
-      tools: ["testCreation", "testExecution", "bugReporting", "testEnvironment", "performanceTesting"],
+      tools: ["createTestEnvironment", "runTestSuite", "cleanupTestEnvironment", "createTodo", "updateTodoStatus", "createProjectNote", "webSearch"],
       workpoolName: "testingWorkpool",
       maxConcurrentTasks: 3,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
