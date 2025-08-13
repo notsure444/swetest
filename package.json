@@ -1,0 +1,17 @@
+{
+  "name": "autonomous-ai-agent-platform",
+  "version": "1.0.0",
+  "description": "Autonomous AI-agent platform for building web/mobile apps with multi-project isolation",
+  "scripts": {
+    "dev": "convex dev",
+    "build": "convex build",
+    "start": "convex dev"
+  },
+  "keywords": ["convex", "ai", "agents", "autonomous", "development"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "convex": "^1.0.0"
+  },
+  "dependencies": {}
+}
