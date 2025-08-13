@@ -3,7 +3,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Projects table for managing multiple isolated projects
+  // Projects table for managing multiple isolated projects with enhanced management
   projects: defineTable({
     name: v.string(),
     description: v.string(),
@@ -11,25 +11,54 @@ export default defineSchema({
     status: v.union(
       v.literal("created"),
       v.literal("planning"),
+      v.literal("architecture"),
+      v.literal("task_breakdown"),
       v.literal("development"),
       v.literal("testing"),
+      v.literal("integration"),
+      v.literal("deployment_prep"),
       v.literal("deployment"),
+      v.literal("validation"),
+      v.literal("maintenance"),
       v.literal("completed"),
       v.literal("paused"),
+      v.literal("cancelled"),
       v.literal("failed")
     ),
+    priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent"))),
+    complexity: v.optional(v.union(v.literal("simple"), v.literal("moderate"), v.literal("complex"), v.literal("enterprise"))),
     createdAt: v.number(),
     updatedAt: v.number(),
     configuration: v.object({
       techStack: v.array(v.string()),
       requirements: v.string(),
-      deliverables: v.array(v.string()),
-      evaluationCriteria: v.array(v.string()),
+      deliverables: v.array(v.any()),
+      evaluationCriteria: v.array(v.any()),
+      estimatedDuration: v.optional(v.string()),
+      targetAudience: v.optional(v.string()),
+      businessGoals: v.optional(v.array(v.string())),
+      technicalConstraints: v.optional(v.array(v.string())),
     }),
     namespace: v.string(), // For RAG and data isolation
     containerId: v.optional(v.string()), // Docker container ID for isolation
+    lifecycle: v.optional(v.object({
+      currentState: v.string(),
+      stateHistory: v.array(v.any()),
+      estimatedCompletion: v.optional(v.number()),
+    })),
+    metrics: v.optional(v.object({
+      totalDeliverables: v.number(),
+      completedDeliverables: v.number(),
+      totalEvaluations: v.number(),
+      passedEvaluations: v.number(),
+      progressPercentage: v.number(),
+      qualityScore: v.number(),
+    })),
+    agentAssignments: v.optional(v.array(v.any())),
   }).index("by_status", ["status"])
-    .index("by_namespace", ["namespace"]),
+    .index("by_namespace", ["namespace"])
+    .index("by_priority", ["priority"])
+    .index("by_complexity", ["complexity"]),
 
   // Agent instances and their states
   agents: defineTable({
@@ -213,4 +242,5 @@ export default defineSchema({
   }).index("by_project", ["projectId"])
     .index("by_status", ["status"]),
 });
+
 
