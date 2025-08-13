@@ -241,6 +241,84 @@ export default defineSchema({
     lastMessageAt: v.number(),
   }).index("by_project", ["projectId"])
     .index("by_status", ["status"]),
+
+  // Deliverables tracking for comprehensive project management
+  deliverables: defineTable({
+    projectId: v.id("projects"),
+    deliverableId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    type: v.union(v.literal("feature"), v.literal("component"), v.literal("documentation"), v.literal("test"), v.literal("deployment")),
+    status: v.union(v.literal("not_started"), v.literal("in_progress"), v.literal("review"), v.literal("completed"), v.literal("blocked")),
+    acceptanceCriteria: v.array(v.string()),
+    dependencies: v.array(v.string()),
+    estimatedEffort: v.number(),
+    assignedAgentType: v.optional(v.string()),
+    assignedAgentId: v.optional(v.id("agents")),
+    dueDate: v.optional(v.number()),
+    completionPercentage: v.optional(v.number()),
+    qualityScore: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_deliverable_id", ["deliverableId"])
+    .index("by_assigned_agent", ["assignedAgentId"]),
+
+  // Evaluations for project quality assessment
+  evaluations: defineTable({
+    projectId: v.id("projects"),
+    evaluationId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    type: v.union(v.literal("functionality"), v.literal("performance"), v.literal("security"), v.literal("usability"), v.literal("maintainability")),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
+    weight: v.number(),
+    automatedCheck: v.boolean(),
+    testScript: v.optional(v.string()),
+    criteria: v.array(v.any()),
+    results: v.array(v.any()),
+    score: v.optional(v.number()),
+    passed: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_evaluation_id", ["evaluationId"])
+    .index("by_type", ["type"]),
+
+  // Project infrastructure management for isolation
+  projectInfrastructure: defineTable({
+    projectId: v.id("projects"),
+    namespace: v.string(),
+    containerConfigs: v.array(v.any()),
+    networkConfigs: v.array(v.any()),
+    volumeMounts: v.array(v.any()),
+    status: v.union(v.literal("initializing"), v.literal("ready"), v.literal("running"), v.literal("stopped"), v.literal("failed")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_project", ["projectId"])
+    .index("by_namespace", ["namespace"])
+    .index("by_status", ["status"]),
+
+  // Agent notifications for coordination
+  agentNotifications: defineTable({
+    projectId: v.id("projects"),
+    agentType: v.string(),
+    agentId: v.optional(v.id("agents")),
+    type: v.union(v.literal("state_change"), v.literal("task_assignment"), v.literal("alert"), v.literal("info")),
+    message: v.string(),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent")),
+    read: v.optional(v.boolean()),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+  }).index("by_project", ["projectId"])
+    .index("by_agent_type", ["agentType"])
+    .index("by_agent_id", ["agentId"])
+    .index("by_priority", ["priority"]),
 });
+
 
 
