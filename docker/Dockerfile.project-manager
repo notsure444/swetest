@@ -1,0 +1,42 @@
+# docker/Dockerfile.project-manager
+# Dockerfile for the Project Manager service that handles dynamic container orchestration
+
+FROM node:20-alpine
+
+# Install Docker CLI for container management
+RUN apk add --no-cache docker-cli curl
+
+# Create app directory
+WORKDIR /app
+
+# Copy project manager source
+COPY docker/project-manager.js ./project-manager.js
+COPY docker/project-template.yml ./project-template.yml
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Create directories for project management
+RUN mkdir -p /app/projects /app/data /app/docker
+
+# Copy docker configuration templates
+COPY docker/ ./docker/
+
+# Set up non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S project-manager -u 1001 && \
+    chown -R project-manager:nodejs /app
+
+USER project-manager
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3500/health || exit 1
+
+# Expose port for project manager API
+EXPOSE 3500
+
+# Start the project manager service
+CMD ["node", "project-manager.js"]
