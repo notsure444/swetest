@@ -1,0 +1,2 @@
+# This file ensures the projects directory is tracked in git
+# Individual project workspaces will be created dynamically by the system
