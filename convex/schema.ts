@@ -99,41 +99,96 @@ export default defineSchema({
     .index("by_agent", ["assignedAgentId"])
     .index("by_type", ["type"]),
 
-  // Project notes and documentation
-  projectNotes: defineTable({
+  // Enhanced project notes system for agent knowledge management
+  project_notes: defineTable({
     projectId: v.id("projects"),
-    agentId: v.optional(v.id("agents")),
+    agentId: v.string(),
     title: v.string(),
     content: v.string(),
-    type: v.union(
-      v.literal("note"),
-      v.literal("decision"),
-      v.literal("issue"),
-      v.literal("solution"),
-      v.literal("progress")
-    ),
+    category: v.optional(v.string()),
     tags: v.array(v.string()),
+    isPrivate: v.boolean(),
+    associatedTask: v.optional(v.id("tasks")),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_project", ["projectId"])
-    .index("by_type", ["type"])
-    .index("by_agent", ["agentId"]),
+    .index("by_category", ["category"])
+    .index("by_agent", ["agentId"])
+    .index("by_private", ["isPrivate"]),
 
-  // Todo lists for agents
+  // Enhanced todo system with dependencies and priorities
   todos: defineTable({
     projectId: v.id("projects"),
-    agentId: v.id("agents"),
-    taskId: v.optional(v.id("tasks")),
+    agentId: v.string(),
     title: v.string(),
     description: v.optional(v.string()),
-    completed: v.boolean(),
-    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent")),
+    category: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("cancelled")),
     dueDate: v.optional(v.number()),
+    dependencies: v.array(v.id("todos")),
+    associatedTask: v.optional(v.id("tasks")),
+    notes: v.optional(v.string()),
     createdAt: v.number(),
+    updatedAt: v.number(),
     completedAt: v.optional(v.number()),
   }).index("by_project", ["projectId"])
     .index("by_agent", ["agentId"])
-    .index("by_completed", ["completed"]),
+    .index("by_status", ["status"])
+    .index("by_priority", ["priority"]),
+
+  // Tool usage logging for analytics and optimization
+  tool_usage_logs: defineTable({
+    toolName: v.string(),
+    agentId: v.string(),
+    projectId: v.optional(v.id("projects")),
+    parameters: v.any(),
+    timestamp: v.number(),
+  }).index("by_tool", ["toolName"])
+    .index("by_agent", ["agentId"])
+    .index("by_project", ["projectId"])
+    .index("by_timestamp", ["timestamp"]),
+
+  // Search history for web search optimization
+  search_history: defineTable({
+    projectId: v.id("projects"),
+    agentId: v.string(),
+    query: v.string(),
+    results: v.any(),
+    searchType: v.string(),
+    timestamp: v.number(),
+  }).index("by_project", ["projectId"])
+    .index("by_agent", ["agentId"])
+    .index("by_query", ["query"]),
+
+  // Test environments for isolated testing
+  test_environments: defineTable({
+    testEnvId: v.string(),
+    projectId: v.id("projects"),
+    agentId: v.string(),
+    testType: v.union(v.literal("unit"), v.literal("integration"), v.literal("e2e"), v.literal("performance")),
+    status: v.union(v.literal("creating"), v.literal("ready"), v.literal("running"), v.literal("failed"), v.literal("cleaned_up")),
+    configuration: v.any(),
+    containerInfo: v.optional(v.any()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    cleanedUpAt: v.optional(v.number()),
+  }).index("by_project", ["projectId"])
+    .index("by_agent", ["agentId"])
+    .index("by_status", ["status"])
+    .index("by_test_env_id", ["testEnvId"]),
+
+  // Test execution results
+  test_results: defineTable({
+    testEnvironmentId: v.string(),
+    agentId: v.string(),
+    testCommand: v.string(),
+    results: v.any(),
+    timestamp: v.number(),
+  }).index("by_environment", ["testEnvironmentId"])
+    .index("by_agent", ["agentId"])
+    .index("by_timestamp", ["timestamp"]),
 
   // System logs for monitoring and debugging
   systemLogs: defineTable({
@@ -158,3 +213,4 @@ export default defineSchema({
   }).index("by_project", ["projectId"])
     .index("by_status", ["status"]),
 });
+
