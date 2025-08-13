@@ -4,6 +4,8 @@ import { query, mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api, components } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { RAG } from "@convex-dev/rag";
+import { openai } from "@ai-sdk/openai";
 
 // Agent types as defined in our schema
 export type AgentType = 
@@ -573,3 +575,4 @@ export const getAgentMetrics = query({
     return metrics;
   },
 });
+
