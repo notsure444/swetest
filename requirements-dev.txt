@@ -1,0 +1,204 @@
+# Development Dependencies for AI Agent System
+# Additional packages needed for development, testing, and debugging
+
+# Include production requirements
+-r requirements.txt
+
+# ============================================================================
+# DEVELOPMENT AND DEBUGGING TOOLS
+# ============================================================================
+
+# Interactive Python shell
+ipython>=8.15.0
+ipdb>=0.13.13
+
+# Jupyter notebooks for experimentation
+jupyter>=1.0.0
+notebook>=7.0.0
+jupyterlab>=4.0.0
+
+# Memory profiling
+memory-profiler>=0.61.0
+pympler>=0.9
+
+# Performance profiling
+line-profiler>=4.1.0
+py-spy>=0.3.14
+
+# ============================================================================
+# ADVANCED TESTING TOOLS
+# ============================================================================
+
+# Property-based testing
+hypothesis>=6.82.0
+
+# Mutation testing
+mutmut>=2.4.3
+
+# Load testing
+locust>=2.16.0
+
+# API testing
+tavern>=2.4.0
+
+# ============================================================================
+# CODE QUALITY AND ANALYSIS
+# ============================================================================
+
+# Static analysis
+pylint>=2.17.0
+bandit>=1.7.0
+safety>=2.3.0
+
+# Complexity analysis
+radon>=6.0.1
+xenon>=0.9.1
+
+# Import analysis
+import-linter>=1.12.0
+
+# Dependency analysis
+pipdeptree>=2.13.0
+
+# ============================================================================
+# DOCUMENTATION TOOLS
+# ============================================================================
+
+# API documentation
+sphinx-autodoc-typehints>=1.24.0
+sphinx-click>=5.0.0
+
+# Docstring quality
+pydocstyle>=6.3.0
+interrogate>=1.5.0
+
+# ============================================================================
+# FORMATTING AND LINTING
+# ============================================================================
+
+# Advanced formatting
+yapf>=0.40.0
+blue>=0.9.0
+
+# Pre-commit hooks
+pre-commit>=3.4.0
+
+# Import sorting with profiles
+isort[colors]>=5.12.0
+
+# ============================================================================
+# MOCK AND TEST DATA GENERATION
+# ============================================================================
+
+# HTTP mocking
+responses>=0.23.0
+httpretty>=1.1.4
+
+# Time mocking
+freezegun>=1.2.2
+
+# File system mocking
+pyfakefs>=5.2.4
+
+# ============================================================================
+# DEVELOPMENT SERVERS AND TOOLS
+# ============================================================================
+
+# File watching
+watchfiles>=0.20.0
+
+# Hot reloading
+reloader>=0.3.0
+
+# Development server
+uvicorn[standard]>=0.23.0
+
+# ============================================================================
+# DATABASE DEVELOPMENT TOOLS
+# ============================================================================
+
+# Database migration tools
+alembic>=1.12.0
+
+# Database inspection
+sqlalchemy-utils>=0.41.0
+
+# ============================================================================
+# ENVIRONMENT MANAGEMENT
+# ============================================================================
+
+# Virtual environment management
+virtualenv>=20.24.0
+virtualenvwrapper>=4.8.4
+
+# pip management
+pip-review>=1.3.0
+pip-upgrader>=1.4.15
+
+# ============================================================================
+# VISUALIZATION AND ANALYSIS
+# ============================================================================
+
+# Performance visualization
+snakeviz>=2.2.0
+
+# Dependency graphs
+pipdeptree>=2.13.0
+
+# ============================================================================
+# SECURITY DEVELOPMENT TOOLS
+# ============================================================================
+
+# Security testing
+safety>=2.3.0
+pip-audit>=2.6.0
+
+# Secrets detection
+detect-secrets>=1.4.0
+
+# ============================================================================
+# CONTAINER DEVELOPMENT
+# ============================================================================
+
+# Container testing
+testcontainers>=3.7.0
+
+# Docker utilities
+docker-py>=6.1.0
+
+# ============================================================================
+# API DEVELOPMENT TOOLS
+# ============================================================================
+
+# OpenAPI/Swagger tools
+openapi-spec-validator>=0.6.0
+swagger-spec-validator>=3.0.3
+
+# ============================================================================
+# EXPERIMENTAL AND OPTIONAL TOOLS
+# ============================================================================
+
+# Rich console output
+rich>=13.5.0
+typer>=0.9.0
+
+# Progress bars
+tqdm>=4.66.0
+
+# Configuration management
+dynaconf>=3.2.0
+
+# CLI development
+click>=8.1.0
+argparse  # Built-in
+
+# ============================================================================
+# IDE AND EDITOR SUPPORT
+# ============================================================================
+
+# Language server protocol
+python-lsp-server>=1.7.0
+pylsp-mypy>=0.6.7
+
+# Debugging
+debugpy>=1.6.7
