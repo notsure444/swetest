@@ -51,7 +51,7 @@ export class AgentManager {
 - Managing project resources and priorities
 
 You have access to project management tools, communication channels, and can coordinate with other specialized agents to achieve project goals.`,
-      tools: ["projectManagement", "communication", "statusTracking", "resourceAllocation"],
+      tools: ["webSearch", "createTodo", "getTodos", "updateTodoStatus", "createProjectNote", "searchProjectNotes", "semanticCodeSearch"],
       workpoolName: "taskWorkpool",
       maxConcurrentTasks: 3,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
