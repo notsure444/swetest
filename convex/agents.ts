@@ -87,7 +87,7 @@ You have access to architectural tools, design patterns knowledge, and can colla
 - Coordinating parallel work streams
 
 You have access to task management tools, resource planning, and can analyze project requirements to create detailed work plans.`,
-      tools: ["taskBreakdown", "scheduling", "resourcePlanning", "dependencyAnalysis"],
+      tools: ["createTodo", "updateTodoStatus", "getTodos", "createProjectNote", "searchProjectNotes", "webSearch"],
       workpoolName: "taskWorkpool",
       maxConcurrentTasks: 4,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
