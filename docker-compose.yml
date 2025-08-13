@@ -1,0 +1,171 @@
+# docker-compose.yml
+# Main Docker Compose configuration for autonomous AI-agent platform
+# This extends the base configuration with project-specific services
+
+version: '3.8'
+
+# Import base configuration for shared services
+include:
+  - docker/docker-compose.base.yml
+
+# Additional services for multi-project isolation
+services:
+  # Project Manager Service
+  project-manager:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.project-manager
+    container_name: convex_project_manager
+    restart: unless-stopped
+    networks:
+      - convex_shared
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - ./docker:/app/docker:ro
+      - ./projects:/app/projects:rw
+      - project_manager_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - CONVEX_URL=http://convex-backend:3210
+      - BASE_PROJECT_PORT=4000
+      - MAX_CONCURRENT_PROJECTS=10
+    depends_on:
+      convex-backend:
+        condition: service_healthy
+    labels:
+      - "service.type=project_management"
+      - "isolation.manager=true"
+
+  # Container Registry (for custom project images)
+  registry:
+    image: registry:2
+    container_name: convex_registry
+    restart: unless-stopped
+    networks:
+      - convex_shared
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry_data:/var/lib/registry
+    environment:
+      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
+      - REGISTRY_AUTH=none
+    labels:
+      - "service.type=container_registry"
+
+  # Log Aggregator for all project containers
+  log-aggregator:
+    image: fluent/fluent-bit:latest
+    container_name: convex_log_aggregator
+    restart: unless-stopped
+    networks:
+      - convex_shared
+    ports:
+      - "24224:24224"
+    volumes:
+      - ./docker/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - prometheus
+    labels:
+      - "service.type=logging"
+
+# Networks for multi-project isolation
+networks:
+  # Extend the shared network from base configuration
+  convex_shared:
+    external: true
+  
+  # Project isolation networks will be created dynamically
+  # by the project management system
+
+# Volumes for multi-project data
+volumes:
+  # Extend volumes from base configuration
+  convex_data:
+    external: true
+  dashboard_node_modules:
+    external: true
+  shared_cache:
+    external: true
+  
+  # Additional volumes for project isolation
+  project_manager_data:
+    driver: local
+    labels:
+      - "volume.type=project_management"
+      
+  registry_data:
+    driver: local
+    labels:
+      - "volume.type=container_registry"
+      
+  # Project-specific volumes are created dynamically
+  # Format: {project_namespace}_{volume_type}
+  # Examples: 
+  # - project_abc123_code
+  # - project_abc123_test_results
+  # - project_abc123_assets
+
+# Global configuration for project isolation
+x-project-isolation: &project-isolation
+  # Security settings for isolated containers
+  security_opt:
+    - no-new-privileges:true
+  # Read-only root filesystem where possible
+  read_only: true
+  # Temporary filesystem for /tmp
+  tmpfs:
+    - /tmp:noexec,nosuid,size=100m
+  # User namespace isolation
+  user: "1000:1000"
+  # Resource limits
+  deploy:
+    resources:
+      limits:
+        cpus: '2.0'
+        memory: 2G
+      reservations:
+        cpus: '0.5'
+        memory: 512M
+
+# Template for project services (used by project manager)
+x-project-dev-template: &project-dev-template
+  <<: *project-isolation
+  restart: unless-stopped
+  # Will be connected to project-specific network + shared network
+  logging:
+    driver: fluentd
+    options:
+      fluentd-address: "log-aggregator:24224"
+      tag: "project.{{.Name}}"
+  healthcheck:
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 60s
+
+x-project-test-template: &project-test-template
+  <<: *project-isolation
+  restart: "no" # Only run when explicitly started
+  logging:
+    driver: fluentd
+    options:
+      fluentd-address: "log-aggregator:24224"
+      tag: "project.test.{{.Name}}"
+
+x-project-deploy-template: &project-deploy-template
+  <<: *project-isolation
+  restart: "no" # Only run for deployment testing
+  logging:
+    driver: fluentd
+    options:
+      fluentd-address: "log-aggregator:24224"  
+      tag: "project.deploy.{{.Name}}"
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
