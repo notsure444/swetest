@@ -13,6 +13,10 @@ volumes:
   convex_data:
   dashboard_node_modules:
   shared_cache:
+  postgres_data:
+  minio_data:
+  elasticsearch_data:
+  rabbitmq_data:
 
 services:
   # Convex Backend Service (shared across all projects)
@@ -240,4 +244,5 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
+
 
