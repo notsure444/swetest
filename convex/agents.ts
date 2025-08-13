@@ -141,7 +141,7 @@ You have access to testing tools, isolated test environments, and can coordinate
 - Providing quality improvement recommendations
 
 You have access to quality analysis tools, reporting systems, and can evaluate all aspects of the development process.`,
-      tools: ["qualityAssessment", "complianceCheck", "reporting", "metrics", "auditTools"],
+      tools: ["searchProjectNotes", "createProjectNote", "getTodos", "createTodo", "webSearch", "semanticCodeSearch"],
       workpoolName: "testingWorkpool",
       maxConcurrentTasks: 2,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
