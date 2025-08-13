@@ -582,4 +582,442 @@ export const getAgentMetrics = query({
   },
 });
 
+// RAG Integration: Add codebase content to semantic search
+export const addCodebaseToRAG = action({
+  args: {
+    projectId: v.id("projects"),
+    filePath: v.string(),
+    content: v.string(),
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+
+    try {
+      // Add content to RAG with project namespace for isolation
+      await rag.add(ctx, {
+        namespace: project.namespace,
+        key: args.filePath,
+        text: args.content,
+        filterValues: [
+          { name: "projectId", value: args.projectId },
+          { name: "fileType", value: args.language || "unknown" },
+          { name: "filePath", value: args.filePath },
+        ],
+      });
+
+      // Log the addition
+      await ctx.db.insert("systemLogs", {
+        projectId: args.projectId,
+        level: "info",
+        message: `Added file to semantic search: ${args.filePath}`,
+        metadata: {
+          filePath: args.filePath,
+          language: args.language,
+          contentLength: args.content.length,
+        },
+        timestamp: Date.now(),
+      });
+
+      return {
+        success: true,
+        message: `Added ${args.filePath} to semantic search`,
+      };
+    } catch (error) {
+      throw new Error(`Failed to add content to RAG: ${error}`);
+    }
+  },
+});
+
+// RAG Integration: Semantic code search for agents
+export const searchCodebase = action({
+  args: {
+    projectId: v.id("projects"),
+    query: v.string(),
+    agentId: v.optional(v.id("agents")),
+    limit: v.optional(v.number()),
+    fileTypes: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+
+    try {
+      // Perform semantic search within project namespace
+      const searchFilters = [
+        { name: "projectId", value: args.projectId },
+      ];
+
+      if (args.fileTypes && args.fileTypes.length > 0) {
+        args.fileTypes.forEach(fileType => {
+          searchFilters.push({ name: "fileType", value: fileType });
+        });
+      }
+
+      const { results, text, entries } = await rag.search(ctx, {
+        namespace: project.namespace,
+        query: args.query,
+        limit: args.limit || 10,
+        filters: searchFilters,
+        vectorScoreThreshold: 0.7,
+      });
+
+      // Log the search if performed by an agent
+      if (args.agentId) {
+        await ctx.db.insert("systemLogs", {
+          projectId: args.projectId,
+          agentId: args.agentId,
+          level: "info",
+          message: `Performed semantic code search: "${args.query}"`,
+          metadata: {
+            query: args.query,
+            resultsCount: results.length,
+            fileTypes: args.fileTypes,
+          },
+          timestamp: Date.now(),
+        });
+      }
+
+      return {
+        success: true,
+        query: args.query,
+        results,
+        formattedText: text,
+        entries,
+        totalResults: results.length,
+      };
+    } catch (error) {
+      throw new Error(`Semantic search failed: ${error}`);
+    }
+  },
+});
+
+// Enhanced Agent Communication: Create group conversation
+export const createAgentGroupThread = mutation({
+  args: {
+    projectId: v.id("projects"),
+    agentIds: v.array(v.id("agents")),
+    topic: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate all agents belong to the project
+    const agents = await Promise.all(
+      args.agentIds.map(id => ctx.db.get(id))
+    );
+
+    const invalidAgent = agents.find((agent, index) => 
+      !agent || agent.projectId !== args.projectId
+    );
+    if (invalidAgent === null || invalidAgent === undefined) {
+      throw new Error("Invalid agent or agent not in project");
+    }
+
+    // Create group thread
+    const threadId = await ctx.db.insert("agentThreads", {
+      projectId: args.projectId,
+      participantIds: args.agentIds,
+      topic: args.topic,
+      status: "active",
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+    });
+
+    // Log thread creation
+    await ctx.db.insert("systemLogs", {
+      projectId: args.projectId,
+      level: "info",
+      message: `Created group thread: ${args.topic}`,
+      metadata: {
+        threadId,
+        participantCount: args.agentIds.length,
+        participants: agents.filter(a => a).map(a => a!.type),
+      },
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: true,
+      threadId,
+      participantCount: args.agentIds.length,
+    };
+  },
+});
+
+// Agent Coordination: Broadcast message to all project agents
+export const broadcastToAllAgents = action({
+  args: {
+    projectId: v.id("projects"),
+    fromAgentId: v.id("agents"),
+    message: v.string(),
+    messageType: v.optional(v.string()),
+    excludeAgentTypes: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const fromAgent = await ctx.db.get(args.fromAgentId);
+    if (!fromAgent || fromAgent.projectId !== args.projectId) {
+      throw new Error("Invalid sender agent");
+    }
+
+    // Get all agents in the project
+    let agents = await ctx.db
+      .query("agents")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.neq(q.field("_id"), args.fromAgentId))
+      .collect();
+
+    // Filter out excluded agent types
+    if (args.excludeAgentTypes && args.excludeAgentTypes.length > 0) {
+      agents = agents.filter(agent => 
+        !args.excludeAgentTypes!.includes(agent.type)
+      );
+    }
+
+    // Find or create broadcast thread
+    const allAgentIds = [args.fromAgentId, ...agents.map(a => a._id)];
+    let broadcastThread = await ctx.db
+      .query("agentThreads")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.and(
+        q.eq(q.field("topic"), "Project Broadcast"),
+        q.eq(q.field("participantIds").length, allAgentIds.length)
+      ))
+      .first();
+
+    if (!broadcastThread) {
+      const threadId = await ctx.db.insert("agentThreads", {
+        projectId: args.projectId,
+        participantIds: allAgentIds,
+        topic: "Project Broadcast",
+        status: "active",
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+      });
+      broadcastThread = await ctx.db.get(threadId);
+    }
+
+    if (!broadcastThread) {
+      throw new Error("Failed to create broadcast thread");
+    }
+
+    // Send broadcast message using AI Agent Component
+    try {
+      await components.agent.lib.sendMessage(ctx, {
+        threadId: broadcastThread._id,
+        message: `[BROADCAST from ${fromAgent.type}] ${args.message}`,
+        sender: fromAgent.type,
+        metadata: {
+          messageType: args.messageType || "broadcast",
+          fromAgentId: args.fromAgentId,
+          recipients: agents.map(a => a.type),
+          timestamp: Date.now(),
+        },
+      });
+
+      // Update thread last message time
+      await ctx.db.patch(broadcastThread._id, {
+        lastMessageAt: Date.now(),
+      });
+
+      // Log the broadcast
+      await ctx.db.insert("systemLogs", {
+        projectId: args.projectId,
+        agentId: args.fromAgentId,
+        level: "info",
+        message: `Broadcast message sent to ${agents.length} agents`,
+        metadata: {
+          messageType: args.messageType,
+          recipientCount: agents.length,
+          excludedTypes: args.excludeAgentTypes,
+        },
+        timestamp: Date.now(),
+      });
+
+      return {
+        success: true,
+        threadId: broadcastThread._id,
+        recipientCount: agents.length,
+        recipients: agents.map(a => a.type),
+      };
+    } catch (error) {
+      throw new Error(`Failed to send broadcast: ${error}`);
+    }
+  },
+});
+
+// Agent Tool Integration: Get available tools for agent type
+export const getAgentTools = query({
+  args: {
+    agentType: v.union(
+      v.literal("ProjectManager"),
+      v.literal("SystemArchitect"),
+      v.literal("TaskPlanner"),
+      v.literal("CodeGenerator"),
+      v.literal("TestEngineer"),
+      v.literal("QAAnalyst"),
+      v.literal("DeploymentEngineer")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const config = AgentManager.getAgentConfig(args.agentType);
+    
+    // Enhanced tool definitions with RAG integration
+    const toolDefinitions = {
+      // Project Management Tools
+      projectManagement: {
+        name: "Project Management",
+        description: "Create, update, and track project status and deliverables",
+        functions: ["createProject", "updateProjectStatus", "trackDeliverables"],
+      },
+      
+      // Communication Tools
+      communication: {
+        name: "Agent Communication", 
+        description: "Send messages, coordinate with other agents, and broadcast updates",
+        functions: ["sendMessage", "broadcast", "createGroupThread"],
+      },
+      
+      // Code Search and Analysis
+      codebaseSearch: {
+        name: "Semantic Code Search",
+        description: "Search codebase using semantic queries to find relevant code sections",
+        functions: ["searchCodebase", "addCodeToRAG", "analyzeCodeContext"],
+        ragIntegrated: true,
+      },
+      
+      // Architecture and Design
+      architecturalDesign: {
+        name: "Architectural Design",
+        description: "Create system designs, technical specifications, and architecture diagrams",
+        functions: ["createArchitecturalSpec", "designSystemComponents", "validateArchitecture"],
+      },
+      
+      // Code Generation and Review
+      codeGeneration: {
+        name: "Code Generation",
+        description: "Generate, review, and refactor code based on specifications",
+        functions: ["generateCode", "reviewCode", "refactorCode", "createTests"],
+      },
+      
+      // Testing and Quality Assurance
+      testing: {
+        name: "Testing Framework",
+        description: "Create and execute tests, manage test environments",
+        functions: ["createTests", "runTests", "setupTestEnvironment", "generateTestReports"],
+      },
+      
+      // Deployment and Infrastructure
+      deploymentAutomation: {
+        name: "Deployment Automation",
+        description: "Automate deployment processes and infrastructure management",
+        functions: ["createDeploymentScripts", "setupInfrastructure", "monitorDeployment"],
+      },
+      
+      // Documentation
+      documentationGeneration: {
+        name: "Documentation Generation",
+        description: "Generate technical documentation and API specifications",
+        functions: ["generateDocs", "createAPISpecs", "updateDocumentation"],
+      },
+    };
+
+    return {
+      agentType: args.agentType,
+      availableTools: config.tools.map(toolName => toolDefinitions[toolName as keyof typeof toolDefinitions]).filter(Boolean),
+      systemPrompt: config.systemPrompt,
+      model: config.model,
+      workpool: config.workpoolName,
+      maxConcurrentTasks: config.maxConcurrentTasks,
+    };
+  },
+});
+
+// Agent Context Management: Get agent context with RAG-enhanced information
+export const getAgentContext = action({
+  args: {
+    agentId: v.id("agents"),
+    includeCodeContext: v.optional(v.boolean()),
+    contextQuery: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent) throw new Error("Agent not found");
+
+    const project = await ctx.db.get(agent.projectId);
+    if (!project) throw new Error("Project not found");
+
+    // Get agent's recent messages
+    const recentMessages = await ctx.runQuery(api.agents.getAgentMessages, {
+      agentId: args.agentId,
+      limit: 20,
+    });
+
+    // Get agent's assigned tasks
+    const assignedTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_agent", (q) => q.eq("assignedAgentId", args.agentId))
+      .filter((q) => q.neq(q.field("status"), "completed"))
+      .collect();
+
+    // Get project notes that might be relevant
+    const projectNotes = await ctx.db
+      .query("projectNotes")
+      .withIndex("by_project", (q) => q.eq("projectId", agent.projectId))
+      .order("desc")
+      .take(10);
+
+    let codeContext = null;
+    
+    // Enhanced context with RAG-based code search if requested
+    if (args.includeCodeContext && args.contextQuery) {
+      try {
+        const searchResult = await ctx.runAction(api.agents.searchCodebase, {
+          projectId: agent.projectId,
+          query: args.contextQuery,
+          agentId: args.agentId,
+          limit: 5,
+        });
+        codeContext = searchResult;
+      } catch (error) {
+        // Handle case where no code has been indexed yet
+        codeContext = { error: "No code context available yet" };
+      }
+    }
+
+    return {
+      agentInfo: {
+        id: agent._id,
+        type: agent.type,
+        status: agent.status,
+        currentTask: agent.currentTask,
+        lastActivity: agent.lastActivity,
+      },
+      projectInfo: {
+        id: project._id,
+        name: project.name,
+        status: project.status,
+        namespace: project.namespace,
+        techStack: project.configuration.techStack,
+      },
+      recentMessages: recentMessages.slice(0, 10),
+      assignedTasks: assignedTasks.map(task => ({
+        id: task._id,
+        title: task.title,
+        type: task.type,
+        priority: task.priority,
+        status: task.status,
+      })),
+      projectNotes: projectNotes.map(note => ({
+        title: note.title,
+        type: note.type,
+        content: note.content.substring(0, 200) + "...",
+        createdAt: note.createdAt,
+      })),
+      codeContext,
+      contextGeneratedAt: Date.now(),
+    };
+  },
+});
+
+
 
