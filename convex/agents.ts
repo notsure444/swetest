@@ -159,7 +159,7 @@ You have access to quality analysis tools, reporting systems, and can evaluate a
 - Scaling and optimizing deployed applications
 
 You have access to deployment tools, infrastructure management, monitoring systems, and can coordinate with other agents for successful releases.`,
-      tools: ["deploymentAutomation", "infraManagement", "monitoring", "security", "scaling"],
+      tools: ["webSearch", "createProjectNote", "searchProjectNotes", "createTodo", "getTodos", "createTestEnvironment"],
       workpoolName: "deploymentWorkpool",
       maxConcurrentTasks: 2,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
