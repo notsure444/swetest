@@ -7,6 +7,12 @@ import { Id } from "./_generated/dataModel";
 import { RAG } from "@convex-dev/rag";
 import { openai } from "@ai-sdk/openai";
 
+// Initialize RAG component for semantic code search
+const rag = new RAG(components.rag, {
+  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
+  embeddingDimension: 1536,
+});
+
 // Agent types as defined in our schema
 export type AgentType = 
   | "ProjectManager"
@@ -575,4 +581,5 @@ export const getAgentMetrics = query({
     return metrics;
   },
 });
+
 
