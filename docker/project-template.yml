@@ -1,0 +1,200 @@
+# docker/project-template.yml
+# Template for creating isolated project environments
+# This template is used by the project management system to create isolated containers
+
+version: '3.8'
+
+# Project-specific network (dynamically created)
+networks:
+  ${PROJECT_NAMESPACE}_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${PROJECT_SUBNET}
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "project.id=${PROJECT_ID}"
+      - "isolation.level=${ISOLATION_LEVEL}"
+
+# Project-specific volumes
+volumes:
+  ${PROJECT_NAMESPACE}_code:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=code"
+  ${PROJECT_NAMESPACE}_node_modules:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=dependencies"
+  ${PROJECT_NAMESPACE}_test_results:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=test_results"
+  ${PROJECT_NAMESPACE}_assets:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=build_assets"
+  ${PROJECT_NAMESPACE}_cache:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=cache"
+
+services:
+  # Development Container
+  ${PROJECT_NAMESPACE}_dev:
+    image: ${DEV_IMAGE}
+    container_name: ${PROJECT_NAMESPACE}_development
+    restart: unless-stopped
+    networks:
+      - ${PROJECT_NAMESPACE}_network
+      - convex_shared  # Connect to shared services
+    ports:
+      - "${DEV_PORT_RANGE}" # Dynamic port allocation
+    volumes:
+      - ${PROJECT_NAMESPACE}_code:/app/code
+      - ${PROJECT_NAMESPACE}_node_modules:/app/node_modules
+      - ${PROJECT_NAMESPACE}_cache:/app/.cache
+      - ./projects/${PROJECT_NAMESPACE}/src:/app/code:rw
+    environment:
+      - NODE_ENV=development
+      - PROJECT_ID=${PROJECT_ID}
+      - PROJECT_NAMESPACE=${PROJECT_NAMESPACE}
+      - PROJECT_TYPE=${PROJECT_TYPE}
+      - CONVEX_URL=http://convex-backend:3210
+      - ISOLATION_LEVEL=${ISOLATION_LEVEL}
+    working_dir: /app/code
+    command: ${DEV_COMMAND}
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "container.type=development"
+      - "isolation.level=${ISOLATION_LEVEL}"
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    resource_limits:
+      cpus: '${MAX_CPUS:-2}'
+      memory: ${MAX_MEMORY:-2G}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${DEV_HEALTH_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Testing Container
+  ${PROJECT_NAMESPACE}_test:
+    image: ${TEST_IMAGE}
+    container_name: ${PROJECT_NAMESPACE}_testing
+    restart: "no" # Only run when explicitly started
+    networks:
+      - ${PROJECT_NAMESPACE}_network
+      - convex_shared
+    volumes:
+      - ${PROJECT_NAMESPACE}_code:/app/code:ro
+      - ${PROJECT_NAMESPACE}_test_results:/app/test-results:rw
+      - ${PROJECT_NAMESPACE}_node_modules:/app/node_modules:ro
+    environment:
+      - NODE_ENV=test
+      - PROJECT_ID=${PROJECT_ID}
+      - PROJECT_NAMESPACE=${PROJECT_NAMESPACE}
+      - CI=true
+      - CONVEX_URL=http://convex-backend:3210
+    working_dir: /app/code
+    command: ${TEST_COMMAND}
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "container.type=testing"
+      - "isolation.level=${ISOLATION_LEVEL}"
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /app/test-results:noexec,nosuid,size=500m
+    resource_limits:
+      cpus: '${TEST_CPUS:-1}'
+      memory: ${TEST_MEMORY:-1G}
+    depends_on:
+      - ${PROJECT_NAMESPACE}_dev
+
+  # Deployment/Preview Container
+  ${PROJECT_NAMESPACE}_deploy:
+    image: ${DEPLOY_IMAGE}
+    container_name: ${PROJECT_NAMESPACE}_deployment
+    restart: "no" # Only run for deployment testing
+    networks:
+      - ${PROJECT_NAMESPACE}_network
+      - convex_shared
+    ports:
+      - "${DEPLOY_PORT}:80"
+    volumes:
+      - ${PROJECT_NAMESPACE}_code:/app/code:ro
+      - ${PROJECT_NAMESPACE}_assets:/app/assets:rw
+    environment:
+      - NODE_ENV=production
+      - PROJECT_ID=${PROJECT_ID}
+      - PROJECT_NAMESPACE=${PROJECT_NAMESPACE}
+      - CONVEX_URL=http://convex-backend:3210
+    working_dir: /app
+    command: ${DEPLOY_COMMAND}
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "container.type=deployment"
+      - "isolation.level=${ISOLATION_LEVEL}"
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+    resource_limits:
+      cpus: '${DEPLOY_CPUS:-1}'
+      memory: ${DEPLOY_MEMORY:-1G}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database Container (if needed for project)
+  ${PROJECT_NAMESPACE}_db:
+    image: ${DB_IMAGE:-postgres:15-alpine}
+    container_name: ${PROJECT_NAMESPACE}_database
+    restart: unless-stopped
+    networks:
+      - ${PROJECT_NAMESPACE}_network
+    volumes:
+      - ${PROJECT_NAMESPACE}_db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${PROJECT_NAMESPACE}
+      - POSTGRES_USER=${DB_USER:-project}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PROJECT_NAMESPACE=${PROJECT_NAMESPACE}
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "container.type=database"
+    security_opt:
+      - no-new-privileges:true
+    resource_limits:
+      cpus: '0.5'
+      memory: 512M
+    profiles:
+      - database # Only start if database profile is active
+
+# Additional project-specific volumes for database
+volumes:
+  ${PROJECT_NAMESPACE}_db_data:
+    labels:
+      - "project.namespace=${PROJECT_NAMESPACE}"
+      - "volume.type=database"
