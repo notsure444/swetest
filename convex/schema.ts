@@ -60,9 +60,9 @@ export default defineSchema({
     .index("by_priority", ["priority"])
     .index("by_complexity", ["complexity"]),
 
-  // Agent instances and their states
+  // Agent instances and their states with enhanced management
   agents: defineTable({
-    projectId: v.id("projects"),
+    projectId: v.optional(v.id("projects")),
     type: v.union(
       v.literal("ProjectManager"),
       v.literal("SystemArchitect"),
@@ -73,20 +73,28 @@ export default defineSchema({
       v.literal("DeploymentEngineer")
     ),
     status: v.union(
+      v.literal("available"),
+      v.literal("reserved"),
+      v.literal("busy"),
       v.literal("idle"),
       v.literal("working"),
       v.literal("waiting"),
       v.literal("error"),
       v.literal("completed")
     ),
+    currentProjectId: v.optional(v.id("projects")),
     currentTask: v.optional(v.string()),
+    assignedTasks: v.optional(v.array(v.string())),
     lastActivity: v.number(),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
     configuration: v.object({
       model: v.string(), // GPT-5, Claude 4.1, etc.
       prompt: v.string(),
       tools: v.array(v.string()),
     }),
   }).index("by_project", ["projectId"])
+    .index("by_current_project", ["currentProjectId"])
     .index("by_type", ["type"])
     .index("by_status", ["status"]),
 
@@ -319,6 +327,7 @@ export default defineSchema({
     .index("by_agent_id", ["agentId"])
     .index("by_priority", ["priority"]),
 });
+
 
 
 
