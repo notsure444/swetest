@@ -121,7 +121,8 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiSuggestionType, setAiSuggestionType] = useState<'deliverables' | 'evaluation' | null>(null);
 
-  const createProject = useMutation(api.projects.createProject);
+  const createProject = useMutation(api.projectManager.createEnhancedProject);
+  const getProjectSuggestions = useAction(api.projectManager.getProjectSuggestions);
   const startWorkflow = useMutation(api.workflows.startDevelopmentWorkflow);
 
   const {
@@ -623,5 +624,6 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     </div>
   );
 }
+
 
 
