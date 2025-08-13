@@ -69,7 +69,7 @@ You have access to project management tools, communication channels, and can coo
 - Analyzing system requirements and constraints
 
 You have access to architectural tools, design patterns knowledge, and can collaborate with other agents to implement your designs.`,
-      tools: ["architecturalDesign", "technicalAnalysis", "codebaseSearch", "documentationGeneration"],
+      tools: ["webSearch", "semanticCodeSearch", "addCodeToRAG", "createProjectNote", "searchProjectNotes", "createTodo"],
       workpoolName: "architectureWorkpool",
       maxConcurrentTasks: 2,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
