@@ -141,9 +141,36 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
       type: 'web',
       techStack: [],
       requirements: '',
-      deliverables: [],
-      evaluationCriteria: [],
-      isolationLevel: 'standard',
+      priority: 'medium',
+      complexity: 'moderate',
+      estimatedDuration: '',
+      targetAudience: '',
+      businessGoals: [],
+      technicalConstraints: [],
+      deliverables: [{
+        id: 'del-1',
+        name: 'Initial Setup',
+        description: 'Project initialization and setup',
+        type: 'component',
+        acceptanceCriteria: ['Project structure created'],
+        dependencies: [],
+        estimatedEffort: 2,
+      }],
+      evaluations: [{
+        id: 'eval-1',
+        name: 'Basic Functionality',
+        description: 'Core features working as expected',
+        type: 'functionality',
+        weight: 5,
+        automatedCheck: true,
+        criteria: [{
+          name: 'Feature completeness',
+          description: 'All core features implemented',
+          metric: 'percentage',
+          threshold: 95,
+          critical: true,
+        }],
+      }],
     },
     mode: 'onChange'
   });
@@ -661,6 +688,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     </div>
   );
 }
+
 
 
 
