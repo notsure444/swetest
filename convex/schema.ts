@@ -227,16 +227,25 @@ export default defineSchema({
     .index("by_agent", ["agentId"])
     .index("by_timestamp", ["timestamp"]),
 
-  // System logs for monitoring and debugging
+  // System logs for monitoring and debugging with enhanced categorization
   systemLogs: defineTable({
     projectId: v.optional(v.id("projects")),
     agentId: v.optional(v.id("agents")),
     level: v.union(v.literal("debug"), v.literal("info"), v.literal("warn"), v.literal("error")),
+    category: v.optional(v.union(
+      v.literal("project_management"),
+      v.literal("lifecycle_management"),
+      v.literal("agent_coordination"),
+      v.literal("progress_tracking"),
+      v.literal("infrastructure"),
+      v.literal("system")
+    )),
     message: v.string(),
     metadata: v.optional(v.any()),
     timestamp: v.number(),
   }).index("by_level", ["level"])
     .index("by_project", ["projectId"])
+    .index("by_category", ["category"])
     .index("by_timestamp", ["timestamp"]),
 
   // Agent communication threads (leveraging AI Agent Component)
@@ -327,6 +336,7 @@ export default defineSchema({
     .index("by_agent_id", ["agentId"])
     .index("by_priority", ["priority"]),
 });
+
 
 
 
