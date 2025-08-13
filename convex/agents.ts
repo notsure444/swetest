@@ -105,7 +105,7 @@ You have access to task management tools, resource planning, and can analyze pro
 - Integrating with existing codebases
 
 You have access to code generation tools, semantic code search, testing frameworks, and can collaborate with other agents to ensure code quality.`,
-      tools: ["codeGeneration", "codeReview", "testing", "codebaseSearch", "documentation"],
+      tools: ["semanticCodeSearch", "addCodeToRAG", "createProjectNote", "webSearch", "createTodo", "updateTodoStatus"],
       workpoolName: "codingWorkpool",
       maxConcurrentTasks: 5,
     },
@@ -1018,6 +1018,7 @@ export const getAgentContext = action({
     };
   },
 });
+
 
 
 
