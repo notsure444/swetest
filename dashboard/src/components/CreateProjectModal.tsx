@@ -220,26 +220,63 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
   const onSubmit = async (data: ProjectFormData) => {
     setIsSubmitting(true);
     try {
+      // First get AI suggestions for the project
+      let suggestions = [];
+      try {
+        suggestions = await getProjectSuggestions({
+          projectType: data.type,
+          techStack: data.techStack,
+          requirements: data.requirements,
+          complexity: data.complexity || 'moderate',
+          targetAudience: data.targetAudience,
+          businessGoals: data.businessGoals,
+        });
+        
+        if (suggestions.length > 0) {
+          toast.success(`Generated ${suggestions.length} AI suggestions for your project!`);
+        }
+      } catch (suggestionError) {
+        console.warn('Failed to get AI suggestions:', suggestionError);
+        // Continue without suggestions
+      }
+
+      // Create enhanced project with comprehensive management
       const projectResult = await createProject({
         config: {
-          ...data,
-          isolationLevel: data.isolationLevel || 'standard'
+          name: data.name,
+          description: data.description,
+          type: data.type,
+          techStack: data.techStack,
+          requirements: data.requirements,
+          priority: data.priority || 'medium',
+          complexity: data.complexity || 'moderate',
+          estimatedDuration: data.estimatedDuration,
+          targetAudience: data.targetAudience,
+          businessGoals: data.businessGoals || [],
+          technicalConstraints: data.technicalConstraints || [],
+          deliverables: data.deliverables || [],
+          evaluations: data.evaluations || [],
         }
       });
 
-      if (projectResult.success) {
-        toast.success('Project created successfully!');
+      if (projectResult.projectId) {
+        toast.success(`Enhanced project created successfully! Namespace: ${projectResult.namespace}`);
         
-        // Automatically start the development workflow
+        // Automatically start the development workflow with enhanced coordination
         try {
           await startWorkflow({
             projectId: projectResult.projectId,
             workflowConfig: {
-              parallelExecution: false,
-              priorityLevel: 'medium'
+              parallelExecution: true,
+              priorityLevel: data.priority || 'medium',
+              agentCoordination: true,
+              lifecycle: {
+                currentState: projectResult.status,
+                nextState: 'architecture'
+              }
             }
           });
-          toast.success('Development workflow started!');
+          toast.success('Development workflow started with agent coordination!');
         } catch (workflowError) {
           console.error('Failed to start workflow:', workflowError);
           toast.error('Project created but failed to start workflow');
@@ -624,6 +661,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     </div>
   );
 }
+
 
 
 
