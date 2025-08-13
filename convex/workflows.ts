@@ -1796,3 +1796,486 @@ async function generateDeploymentArtifacts(project: any, deploymentConfig: any, 
   };
 }
 
+// =============================================================================
+// WORKFLOW STATUS AND MONITORING QUERIES
+// =============================================================================
+
+// Get workflow status for a project
+export const getProjectWorkflowStatus = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    const project = await ctx.db.get(projectId);
+    if (!project) return null;
+
+    // Get workflow-related logs
+    const workflowLogs = await ctx.db
+      .query("systemLogs")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .filter((q) => q.or(
+        q.eq(q.field("message"), "Development lifecycle workflow started"),
+        q.eq(q.field("message"), "Development lifecycle workflow completed successfully")
+      ))
+      .order("desc")
+      .take(10);
+
+    // Get current step status from agents
+    const agents = await ctx.db
+      .query("agents")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    // Get current tasks
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    // Calculate workflow progress
+    const totalSteps = 7; // architecture, task_creation, work_assignment, coding, testing, qa, deployment
+    const completedSteps = workflowLogs.filter(log => 
+      log.message.includes("completed") || log.message.includes("successful")
+    ).length;
+
+    const workflowProgress = {
+      totalSteps,
+      completedSteps,
+      progressPercentage: Math.round((completedSteps / totalSteps) * 100),
+      currentStep: determineCurrentWorkflowStep(project.status, agents, tasks),
+    };
+
+    // Get step details
+    const stepStatus = {
+      architecture_design: getStepStatus(agents, tasks, "SystemArchitect", "architecture"),
+      task_creation: getStepStatus(agents, tasks, "TaskPlanner", "planning"),
+      work_assignment: getStepStatus(agents, tasks, "ProjectManager", "planning"),
+      coding: getStepStatus(agents, tasks, "CodeGenerator", "coding"),
+      testing: getStepStatus(agents, tasks, "TestEngineer", "testing"),
+      qa: getStepStatus(agents, tasks, "QAAnalyst", "qa"),
+      deployment: getStepStatus(agents, tasks, "DeploymentEngineer", "deployment"),
+    };
+
+    return {
+      projectId,
+      projectName: project.name,
+      projectStatus: project.status,
+      workflowProgress,
+      stepStatus,
+      lastUpdated: project.updatedAt,
+      workflowLogs: workflowLogs.slice(0, 5), // Recent logs only
+    };
+  },
+});
+
+// Get all active workflows
+export const getActiveWorkflows = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { limit = 20 }) => {
+    // Get projects that have active workflows (in development phases)
+    const activeProjects = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "development"))
+      .order("desc")
+      .take(limit);
+
+    const workflowStatuses = await Promise.all(
+      activeProjects.map(async (project) => {
+        const status = await ctx.runQuery(api.workflows.getProjectWorkflowStatus, {
+          projectId: project._id,
+        });
+        return status;
+      })
+    );
+
+    return workflowStatuses.filter(Boolean);
+  },
+});
+
+// Get workflow performance metrics
+export const getWorkflowMetrics = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    timeRange: v.optional(v.union(v.literal("1d"), v.literal("7d"), v.literal("30d"))),
+  },
+  handler: async (ctx, { projectId, timeRange = "7d" }) => {
+    const timeRangeMs = {
+      "1d": 24 * 60 * 60 * 1000,
+      "7d": 7 * 24 * 60 * 60 * 1000, 
+      "30d": 30 * 24 * 60 * 60 * 1000,
+    }[timeRange];
+
+    const cutoffTime = Date.now() - timeRangeMs;
+
+    let projectQuery = ctx.db.query("projects");
+    if (projectId) {
+      projectQuery = projectQuery.filter((q) => q.eq(q.field("_id"), projectId));
+    }
+
+    const projects = await projectQuery.collect();
+
+    // Get workflow completion data
+    const metrics = await Promise.all(
+      projects.map(async (project) => {
+        const logs = await ctx.db
+          .query("systemLogs")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.and(
+            q.gte(q.field("timestamp"), cutoffTime),
+            q.or(
+              q.eq(q.field("message"), "Development lifecycle workflow completed successfully"),
+              q.eq(q.field("message"), "Development lifecycle workflow started")
+            )
+          ))
+          .collect();
+
+        const startedCount = logs.filter(log => log.message.includes("started")).length;
+        const completedCount = logs.filter(log => log.message.includes("completed")).length;
+
+        return {
+          projectId: project._id,
+          projectName: project.name,
+          workflowsStarted: startedCount,
+          workflowsCompleted: completedCount,
+          completionRate: startedCount > 0 ? (completedCount / startedCount) * 100 : 0,
+          status: project.status,
+        };
+      })
+    );
+
+    // Calculate overall metrics
+    const totalStarted = metrics.reduce((sum, m) => sum + m.workflowsStarted, 0);
+    const totalCompleted = metrics.reduce((sum, m) => sum + m.workflowsCompleted, 0);
+
+    return {
+      timeRange,
+      overallMetrics: {
+        totalWorkflowsStarted: totalStarted,
+        totalWorkflowsCompleted: totalCompleted,
+        overallCompletionRate: totalStarted > 0 ? (totalCompleted / totalStarted) * 100 : 0,
+        activeProjects: projects.length,
+      },
+      projectMetrics: metrics,
+      generatedAt: Date.now(),
+    };
+  },
+});
+
+// Get workflow step performance analysis
+export const getWorkflowStepAnalysis = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    stepType: v.optional(v.union(
+      v.literal("architecture_design"),
+      v.literal("task_creation"),
+      v.literal("work_assignment"), 
+      v.literal("coding"),
+      v.literal("testing"),
+      v.literal("qa"),
+      v.literal("deployment")
+    )),
+  },
+  handler: async (ctx, { projectId, stepType }) => {
+    let logsQuery = ctx.db.query("systemLogs");
+    
+    if (projectId) {
+      logsQuery = logsQuery.withIndex("by_project", (q) => q.eq("projectId", projectId));
+    }
+
+    const workflowLogs = await logsQuery
+      .filter((q) => q.and(
+        q.eq(q.field("level"), "info"),
+        q.or(
+          q.eq(q.field("message"), "Workflow step 'architecture_design' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'task_creation' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'work_assignment' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'coding' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'testing' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'qa' completed successfully"),
+          q.eq(q.field("message"), "Workflow step 'deployment' completed successfully")
+        )
+      ))
+      .order("desc")
+      .take(100);
+
+    // Analyze step performance
+    const stepAnalysis = {
+      architecture_design: { completed: 0, avgDuration: 0, successRate: 100 },
+      task_creation: { completed: 0, avgDuration: 0, successRate: 100 },
+      work_assignment: { completed: 0, avgDuration: 0, successRate: 100 },
+      coding: { completed: 0, avgDuration: 0, successRate: 100 },
+      testing: { completed: 0, avgDuration: 0, successRate: 100 },
+      qa: { completed: 0, avgDuration: 0, successRate: 100 },
+      deployment: { completed: 0, avgDuration: 0, successRate: 100 },
+    };
+
+    // Process logs to calculate metrics
+    workflowLogs.forEach(log => {
+      const stepMatch = log.message.match(/Workflow step '(\w+)' completed successfully/);
+      if (stepMatch && stepMatch[1]) {
+        const step = stepMatch[1] as keyof typeof stepAnalysis;
+        if (stepAnalysis[step]) {
+          stepAnalysis[step].completed++;
+        }
+      }
+    });
+
+    // Filter by step type if specified
+    if (stepType) {
+      return {
+        stepType,
+        analysis: stepAnalysis[stepType],
+        recentLogs: workflowLogs.filter(log => log.message.includes(stepType)).slice(0, 10),
+      };
+    }
+
+    return {
+      overallAnalysis: stepAnalysis,
+      totalStepsCompleted: Object.values(stepAnalysis).reduce((sum, step) => sum + step.completed, 0),
+      recentLogs: workflowLogs.slice(0, 20),
+    };
+  },
+});
+
+// Cancel a running workflow
+export const cancelProjectWorkflow = action({
+  args: {
+    projectId: v.id("projects"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { projectId, reason }) => {
+    const project = await ctx.db.get(projectId);
+    if (!project) throw new Error("Project not found");
+
+    try {
+      // Update project status to paused
+      await ctx.db.patch(projectId, {
+        status: "paused",
+        updatedAt: Date.now(),
+      });
+
+      // Update all agents to idle status
+      const agents = await ctx.db
+        .query("agents")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .collect();
+
+      for (const agent of agents) {
+        await ctx.runMutation(api.agents.updateAgentStatus, {
+          agentId: agent._id,
+          status: "idle",
+          currentTask: undefined,
+        });
+      }
+
+      // Cancel pending tasks
+      const pendingTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .filter((q) => q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "in_progress")
+        ))
+        .collect();
+
+      for (const task of pendingTasks) {
+        await ctx.db.patch(task._id, {
+          status: "blocked",
+          updatedAt: Date.now(),
+        });
+      }
+
+      // Log cancellation
+      await ctx.db.insert("systemLogs", {
+        projectId,
+        level: "warn",
+        message: `Workflow cancelled: ${reason || "Manual cancellation"}`,
+        metadata: {
+          reason,
+          cancelledAt: Date.now(),
+          cancelledTasks: pendingTasks.length,
+        },
+        timestamp: Date.now(),
+      });
+
+      return {
+        success: true,
+        message: `Workflow for project "${project.name}" has been cancelled`,
+        cancelledTasks: pendingTasks.length,
+        reason,
+      };
+    } catch (error) {
+      await ctx.db.insert("systemLogs", {
+        projectId,
+        level: "error",
+        message: `Failed to cancel workflow: ${error}`,
+        timestamp: Date.now(),
+      });
+
+      throw error;
+    }
+  },
+});
+
+// Resume a paused workflow
+export const resumeProjectWorkflow = action({
+  args: {
+    projectId: v.id("projects"),
+    fromStep: v.optional(v.union(
+      v.literal("architecture_design"),
+      v.literal("task_creation"),
+      v.literal("work_assignment"),
+      v.literal("coding"),
+      v.literal("testing"),
+      v.literal("qa"),
+      v.literal("deployment")
+    )),
+  },
+  handler: async (ctx, { projectId, fromStep }) => {
+    const project = await ctx.db.get(projectId);
+    if (!project) throw new Error("Project not found");
+
+    if (project.status !== "paused") {
+      throw new Error("Project is not in paused state");
+    }
+
+    try {
+      // Determine which steps to skip based on fromStep parameter
+      const allSteps = [
+        "architecture_design", "task_creation", "work_assignment", 
+        "coding", "testing", "qa", "deployment"
+      ];
+      
+      const skipSteps = fromStep 
+        ? allSteps.slice(0, allSteps.indexOf(fromStep)) 
+        : [];
+
+      // Resume workflow from specified step
+      const workflowId = await workflowManager.start(
+        ctx,
+        api.workflows.developmentLifecycleWorkflow,
+        { 
+          projectId, 
+          workflowConfig: { 
+            skipSteps,
+            parallelExecution: false,
+            priorityLevel: "medium" as const,
+          } 
+        },
+        {
+          onComplete: api.workflows.onDevelopmentWorkflowComplete,
+          context: { projectId, workflowType: "resumed_development_lifecycle" },
+        }
+      );
+
+      // Update project status
+      await ctx.db.patch(projectId, {
+        status: "development",
+        updatedAt: Date.now(),
+      });
+
+      // Log resumption
+      await ctx.db.insert("systemLogs", {
+        projectId,
+        level: "info",
+        message: `Workflow resumed from step: ${fromStep || "beginning"}`,
+        metadata: {
+          workflowId,
+          resumedFrom: fromStep,
+          skippedSteps: skipSteps,
+        },
+        timestamp: Date.now(),
+      });
+
+      return {
+        success: true,
+        workflowId,
+        message: `Workflow resumed for project "${project.name}" from step: ${fromStep || "beginning"}`,
+        skippedSteps: skipSteps,
+      };
+    } catch (error) {
+      await ctx.db.insert("systemLogs", {
+        projectId,
+        level: "error",
+        message: `Failed to resume workflow: ${error}`,
+        timestamp: Date.now(),
+      });
+
+      throw error;
+    }
+  },
+});
+
+// =============================================================================
+// HELPER FUNCTIONS FOR WORKFLOW MONITORING
+// =============================================================================
+
+function determineCurrentWorkflowStep(projectStatus: string, agents: any[], tasks: any[]) {
+  switch (projectStatus) {
+    case "planning":
+      return "architecture_design";
+    case "development":
+      // Determine based on agent activity
+      const activeAgent = agents.find(agent => agent.status === "working");
+      if (activeAgent) {
+        const agentTypeToStep: Record<string, string> = {
+          "SystemArchitect": "architecture_design",
+          "TaskPlanner": "task_creation", 
+          "ProjectManager": "work_assignment",
+          "CodeGenerator": "coding",
+          "TestEngineer": "testing",
+          "QAAnalyst": "qa",
+          "DeploymentEngineer": "deployment",
+        };
+        return agentTypeToStep[activeAgent.type] || "coding";
+      }
+      return "coding";
+    case "testing":
+      return "testing";
+    case "deployment":
+      return "deployment";
+    case "completed":
+      return "deployment";
+    default:
+      return "architecture_design";
+  }
+}
+
+function getStepStatus(agents: any[], tasks: any[], agentType: string, taskType: string) {
+  const agent = agents.find(a => a.type === agentType);
+  const relatedTasks = tasks.filter(t => t.type === taskType);
+  
+  if (!agent) {
+    return { status: "not_started", agent: null, tasks: [] };
+  }
+
+  let status = "not_started";
+  if (agent.status === "working" || agent.status === "waiting") {
+    status = "in_progress";
+  } else if (agent.status === "completed" || relatedTasks.some(t => t.status === "completed")) {
+    status = "completed";
+  } else if (agent.status === "error" || relatedTasks.some(t => t.status === "failed")) {
+    status = "failed";
+  }
+
+  return {
+    status,
+    agent: {
+      id: agent._id,
+      type: agent.type,
+      status: agent.status,
+      currentTask: agent.currentTask,
+      lastActivity: agent.lastActivity,
+    },
+    tasks: relatedTasks.map(t => ({
+      id: t._id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+    })),
+    taskCount: relatedTasks.length,
+    completedTasks: relatedTasks.filter(t => t.status === "completed").length,
+  };
+}
+
+
