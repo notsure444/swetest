@@ -18,5 +18,12 @@
   "license": "MIT",
   "devDependencies": {
     "convex": "^1.25.4"
+  },
+  "dependencies": {
+    "@convex-dev/agent": "^0.1.17",
+    "@convex-dev/rag": "^0.5.2",
+    "@convex-dev/rate-limiter": "^0.2.12",
+    "@convex-dev/workflow": "^0.2.5",
+    "@convex-dev/workpool": "^0.2.17"
   }
 }
